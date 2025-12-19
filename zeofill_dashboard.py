@@ -12,7 +12,7 @@ import hashlib
 # --- CONFIG & ASSETS ---
 st.set_page_config(
    page_title="ZeoFill Analytics",
-   page_icon="📊",
+   page_icon="🐾",
    layout="wide",
    initial_sidebar_state="collapsed"
 )
@@ -40,27 +40,30 @@ def check_password():
     if st.session_state.get("password_correct", False):
         return True
 
-    # Show login form
+    # Show login form with logo
     st.markdown("""
         <style>
         .login-container {
             max-width: 400px;
             margin: 100px auto;
             padding: 40px;
-            background: rgba(30, 41, 59, 0.7);
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
             text-align: center;
         }
-        .login-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2DD4BF;
-            margin-bottom: 10px;
+        .login-logo {
+            margin-bottom: 30px;
+        }
+        .login-logo img {
+            max-width: 200px;
+            border-radius: 10px;
         }
         .login-subtitle {
             color: #9CA3AF;
             margin-bottom: 30px;
+            font-size: 1rem;
+        }
+        .login-subtitle .lock-icon {
+            color: #2DD4BF;
+            font-size: 1.2rem;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -68,8 +71,18 @@ def check_password():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        st.markdown('<div class="login-title">🔒 ZeoFill Analytics</div>', unsafe_allow_html=True)
-        st.markdown('<div class="login-subtitle">Enter password to access dashboard</div>', unsafe_allow_html=True)
+
+        # Display company logo
+        try:
+            logo_path = Path("assets/company-logo.jpg")
+            if logo_path.exists():
+                st.image(str(logo_path), use_container_width=False, width=200)
+            else:
+                st.markdown('<div class="login-logo">🐾 ZeoFill</div>', unsafe_allow_html=True)
+        except:
+            st.markdown('<div class="login-logo">🐾 ZeoFill</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="login-subtitle"><span class="lock-icon">🔒</span> Enter password to access dashboard</div>', unsafe_allow_html=True)
 
         st.text_input(
             "Password",
@@ -964,6 +977,65 @@ def main():
                </div>
            </div>"""
            components.html(cost_html, height=440)
+
+       # Export Data Button
+       st.markdown("<br>", unsafe_allow_html=True)
+       st.markdown("---")
+
+       export_col1, export_col2, export_col3 = st.columns([1, 2, 1])
+       with export_col2:
+           st.markdown('<div style="text-align: center;">', unsafe_allow_html=True)
+
+           if st.button("📥 Export Filtered Data", use_container_width=True, type="primary"):
+               # Use the selected channels from the filter
+               selected_channels = channels if channels else ["Shopify", "Walmart", "Amazon"]
+
+               # Generate CSV for each selected channel
+               export_files = {}
+               for channel in selected_channels:
+                   channel_df = df[df['channel'] == channel].copy()
+
+                   if not channel_df.empty:
+                       # Convert to CSV
+                       csv_data = channel_df.to_csv(index=False)
+                       export_files[channel] = csv_data
+
+               # Create download buttons for each file
+               if export_files:
+                   st.success(f"✅ Generated {len(export_files)} file(s)")
+
+                   # Create columns for download buttons
+                   if len(export_files) == 1:
+                       # Single file - centered button
+                       download_cols = st.columns([1, 2, 1])
+                       col_index = 1
+                       for channel, csv_data in export_files.items():
+                           with download_cols[col_index]:
+                               date_suffix = datetime.now().strftime("%Y%m%d")
+                               filename = f"{channel}_orders_{date_preset.lower().replace(' ', '_')}_{date_suffix}.csv"
+                               st.download_button(
+                                   label=f"⬇️ Download {channel} Data",
+                                   data=csv_data,
+                                   file_name=filename,
+                                   mime="text/csv",
+                                   use_container_width=True
+                               )
+                   else:
+                       # Multiple files - multiple buttons
+                       for channel, csv_data in export_files.items():
+                           date_suffix = datetime.now().strftime("%Y%m%d")
+                           filename = f"{channel}_orders_{date_preset.lower().replace(' ', '_')}_{date_suffix}.csv"
+                           st.download_button(
+                               label=f"⬇️ Download {channel} Data",
+                               data=csv_data,
+                               file_name=filename,
+                               mime="text/csv",
+                               use_container_width=True
+                           )
+               else:
+                   st.warning("⚠️ No data available for selected filters")
+
+           st.markdown('</div>', unsafe_allow_html=True)
 
 
    # --- PROFITABILITY TAB ---

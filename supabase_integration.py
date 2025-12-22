@@ -160,6 +160,28 @@ def transform_shopify_walmart_data(df: pd.DataFrame, channel: str) -> pd.DataFra
     else:
         transformed['shipping_terms'] = None
 
+    # Customer name
+    if 'customer_name' in df.columns:
+        transformed['customer_name'] = df['customer_name'].astype(str).str.strip()
+    else:
+        transformed['customer_name'] = 'N/A'
+
+    # Shipping address fields
+    if 'shipping_address' in df.columns:
+        transformed['shipping_address'] = df['shipping_address'].astype(str).str.strip()
+    else:
+        transformed['shipping_address'] = 'N/A'
+
+    if 'shipping_city' in df.columns:
+        transformed['shipping_city'] = df['shipping_city'].astype(str).str.strip()
+    else:
+        transformed['shipping_city'] = 'N/A'
+
+    if 'shipping_zipcode' in df.columns:
+        transformed['shipping_zipcode'] = df['shipping_zipcode'].astype(str).str.strip()
+    else:
+        transformed['shipping_zipcode'] = 'N/A'
+
     # Calculate COGS (Cost of Goods Sold)
     # Estimate: 40% of revenue (adjust this percentage as needed)
     transformed['cogs'] = transformed['revenue'] * 0.40
@@ -299,6 +321,28 @@ def transform_amazon_data(df: pd.DataFrame) -> pd.DataFrame:
     else:
         transformed['financial_status'] = 'paid'
         transformed['order_status'] = 'Shipped'
+
+    # Customer name (Amazon uses recipient-name)
+    if 'recipient-name' in df.columns:
+        transformed['customer_name'] = df['recipient-name'].astype(str).str.strip()
+    else:
+        transformed['customer_name'] = 'N/A'
+
+    # Shipping address fields (Amazon uses ship-address, ship-city, ship-postal-code)
+    if 'ship-address' in df.columns:
+        transformed['shipping_address'] = df['ship-address'].astype(str).str.strip()
+    else:
+        transformed['shipping_address'] = 'N/A'
+
+    if 'ship-city' in df.columns:
+        transformed['shipping_city'] = df['ship-city'].astype(str).str.strip()
+    else:
+        transformed['shipping_city'] = 'N/A'
+
+    if 'ship-postal-code' in df.columns:
+        transformed['shipping_zipcode'] = df['ship-postal-code'].astype(str).str.strip()
+    else:
+        transformed['shipping_zipcode'] = 'N/A'
 
     # Calculate COGS (Cost of Goods Sold)
     # Estimate: 40% of revenue (adjust as needed)

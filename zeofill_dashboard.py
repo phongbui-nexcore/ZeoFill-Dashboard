@@ -44,7 +44,7 @@ def check_password():
     st.markdown("""
         <style>
         .login-container {
-            max-width: 400px;
+            max-width: 800px;
             margin: 100px auto;
             padding: 40px;
             text-align: center;
@@ -1243,16 +1243,20 @@ def main():
        st.markdown('<div class="chart-container"><div class="chart-header">Unfulfilled Orders Details</div></div>', unsafe_allow_html=True)
 
        if total_unfulfilled > 0:
-           # Prepare table data
-           table_data = df_unfulfilled[['date', 'channel', 'order_id', 'products', 'state', 'revenue', 'financial_status']].copy()
+           # Prepare table data with new columns
+           table_data = df_unfulfilled[['date', 'channel', 'order_id', 'customer_name', 'products', 'state', 'shipping_address', 'shipping_city', 'shipping_zipcode', 'revenue', 'financial_status']].copy()
            table_data['date'] = table_data['date'].dt.strftime('%Y-%m-%d')
            table_data = table_data.sort_values('date', ascending=False)
            table_data = table_data.rename(columns={
                'date': 'Order Date',
                'channel': 'Channel',
                'order_id': 'Order ID',
+               'customer_name': 'Customer Name',
                'products': 'Product',
                'state': 'State',
+               'shipping_address': 'Shipping Address',
+               'shipping_city': 'City',
+               'shipping_zipcode': 'Zip Code',
                'revenue': 'Value',
                'financial_status': 'Status'
            })

@@ -118,7 +118,7 @@ def transform_shopify_walmart_data(df: pd.DataFrame, channel: str) -> pd.DataFra
 
     # Map order_id - use order_number for Shopify if available, otherwise use order_id
     if 'order_number' in df.columns and channel == 'Shopify':
-        transformed['order_id'] = df['order_number'].astype(str).str.strip()
+        transformed['order_id'] = 'Order #' + df['order_number'].astype(str).str.strip()
     else:
         transformed['order_id'] = df['order_id'].astype(str).str.strip()
 

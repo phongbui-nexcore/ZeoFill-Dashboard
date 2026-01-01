@@ -147,12 +147,9 @@ def transform_shopify_walmart_data(df: pd.DataFrame, channel: str) -> pd.DataFra
         else:
             transformed['shipping_cost'] = pd.to_numeric(df['line_shipping'], errors='coerce').fillna(0)
     elif channel == 'Walmart':
-        # Walmart: Use commission_from_sale where transaction_type = ADJMNT from fees table
-        if 'commission_from_sale' in df.columns and 'transaction_type' in df.columns:
-            # Filter for ADJMNT transactions
-            mask = df['transaction_type'].astype(str).str.upper() == 'ADJMNT'
-            transformed['shipping_cost'] = pd.to_numeric(df['commission_from_sale'], errors='coerce').fillna(0)
-            transformed.loc[~mask, 'shipping_cost'] = 0
+        # Walmart: Use walmart_shipping column from aggregated fee data
+        if 'walmart_shipping' in df.columns:
+            transformed['shipping_cost'] = pd.to_numeric(df['walmart_shipping'], errors='coerce').fillna(0)
         else:
             transformed['shipping_cost'] = pd.to_numeric(df['line_shipping'], errors='coerce').fillna(0)
     else:
@@ -228,12 +225,9 @@ def transform_shopify_walmart_data(df: pd.DataFrame, channel: str) -> pd.DataFra
             # Fallback: 2.9% + $0.30 per transaction + 3% for basic plan
             transformed['platform_fee'] = (transformed['revenue'] * 0.059) + 0.30
     elif channel == 'Walmart':
-        # Walmart: Use commission_from_sale where transaction_type = SALE from fees table
-        if 'commission_from_sale' in df.columns and 'transaction_type' in df.columns:
-            # Filter for SALE transactions
-            mask = df['transaction_type'].astype(str).str.upper() == 'SALE'
-            transformed['platform_fee'] = pd.to_numeric(df['commission_from_sale'], errors='coerce').fillna(0)
-            transformed.loc[~mask, 'platform_fee'] = 0
+        # Walmart: Use processing_fee column from aggregated fee data (SALE transactions)
+        if 'processing_fee' in df.columns:
+            transformed['platform_fee'] = pd.to_numeric(df['processing_fee'], errors='coerce').fillna(0)
         else:
             # Fallback: 15% referral fee (average)
             transformed['platform_fee'] = transformed['revenue'] * 0.15
@@ -547,7 +541,16 @@ def fetch_shopify_data() -> pd.DataFrame:
             elif 'order_id' in df_fees.columns:
                 merge_key = 'order_id'
 
-            df_raw = df_raw.merge(df_fees, on=merge_key, how='left', suffixes=('', '_fee'))
+            # Aggregate fee data to ensure one row per order
+            # For Shopify: processing_fee should be unique per order
+            # We'll take the first processing_fee value for each order
+            fee_cols_to_keep = [merge_key]
+            if 'processing_fee' in df_fees.columns:
+                fee_cols_to_keep.append('processing_fee')
+
+            df_fees_agg = df_fees[fee_cols_to_keep].drop_duplicates(subset=[merge_key], keep='first')
+
+            df_raw = df_raw.merge(df_fees_agg, on=merge_key, how='left', suffixes=('', '_fee'))
 
         # Transform the data to dashboard format
         df = transform_shopify_walmart_data(df_raw, 'Shopify')
@@ -607,7 +610,38 @@ def fetch_walmart_data() -> pd.DataFrame:
         if df_fees is not None and not df_fees.empty:
             # Merge on order_id
             if 'order_id' in df_fees.columns:
-                df_raw = df_raw.merge(df_fees, on='order_id', how='left', suffixes=('', '_fee'))
+                # Aggregate fee data by order_id and transaction_type
+                # For Walmart we need:
+                # - commission_from_sale where transaction_type = 'SALE' for platform fees
+                # - commission_from_sale where transaction_type = 'ADJMNT' for shipping costs
+
+                # Create separate columns for each transaction type
+                fee_pivot = df_fees.copy()
+
+                # Get platform fee (SALE transactions)
+                platform_fees = fee_pivot[fee_pivot['transaction_type'].astype(str).str.upper() == 'SALE'].copy()
+                if not platform_fees.empty:
+                    platform_fees = platform_fees.groupby('order_id')['commission_from_sale'].sum().reset_index()
+                    platform_fees.rename(columns={'commission_from_sale': 'processing_fee'}, inplace=True)
+
+                # Get shipping costs (ADJMNT transactions)
+                shipping_fees = fee_pivot[fee_pivot['transaction_type'].astype(str).str.upper() == 'ADJMNT'].copy()
+                if not shipping_fees.empty:
+                    shipping_fees = shipping_fees.groupby('order_id')['commission_from_sale'].sum().reset_index()
+                    shipping_fees.rename(columns={'commission_from_sale': 'walmart_shipping'}, inplace=True)
+
+                # Merge platform fees
+                if not platform_fees.empty:
+                    df_raw = df_raw.merge(platform_fees, on='order_id', how='left')
+
+                # Merge shipping fees
+                if not shipping_fees.empty:
+                    df_raw = df_raw.merge(shipping_fees, on='order_id', how='left')
+
+                # Also keep transaction_type for the transformation function
+                # We'll merge the full fee data but mark which transaction types exist
+                fee_types = fee_pivot.groupby('order_id')['transaction_type'].apply(lambda x: ','.join(x.unique())).reset_index()
+                df_raw = df_raw.merge(fee_types, on='order_id', how='left', suffixes=('', '_fee'))
 
         # Transform the data to dashboard format
         df = transform_shopify_walmart_data(df_raw, 'Walmart')
@@ -667,7 +701,26 @@ def fetch_amazon_data() -> pd.DataFrame:
         if df_fees is not None and not df_fees.empty:
             # Merge on amazon-order-id
             if 'amazon-order-id' in df_fees.columns:
-                df_raw = df_raw.merge(df_fees, on='amazon-order-id', how='left', suffixes=('', '_fee'))
+                # Aggregate fee data by amazon-order-id
+                # For Amazon we need:
+                # - shop_fees for platform fees
+                # - shipping_label_cost for shipping costs
+
+                fee_cols_to_aggregate = ['amazon-order-id']
+                agg_dict = {}
+
+                if 'shop_fees' in df_fees.columns:
+                    fee_cols_to_aggregate.append('shop_fees')
+                    agg_dict['shop_fees'] = 'sum'
+
+                if 'shipping_label_cost' in df_fees.columns:
+                    fee_cols_to_aggregate.append('shipping_label_cost')
+                    agg_dict['shipping_label_cost'] = 'sum'
+
+                # Aggregate fees per order
+                df_fees_agg = df_fees.groupby('amazon-order-id').agg(agg_dict).reset_index()
+
+                df_raw = df_raw.merge(df_fees_agg, on='amazon-order-id', how='left', suffixes=('', '_fee'))
 
         # Transform the data to dashboard format
         df = transform_amazon_data(df_raw)

@@ -9,6 +9,19 @@ import streamlit.components.v1 as components
 import hashlib
 
 
+# --- HELPER FUNCTIONS ---
+def format_currency_smart(value: float) -> str:
+    """
+    Dynamically format currency based on value size.
+    - Values >= 1000: Show in thousands with K suffix (e.g., $1.23K)
+    - Values < 1000: Show as-is (e.g., $19.50)
+    """
+    if abs(value) >= 1000:
+        return f"${value/1000:.2f}K"
+    else:
+        return f"${value:.2f}"
+
+
 # --- CONFIG & ASSETS ---
 st.set_page_config(
    page_title="ZeoFill Analytics",
@@ -971,7 +984,7 @@ def main():
                <div class="metric-label">TOTAL REVENUE</div>
                <div class="metric-value">${metrics['total_revenue']:,.2f}</div>
                {format_delta_html(metrics.get('total_revenue_delta', 0))}
-               <div class="metric-sub-label">Net: ${metrics['net_revenue']/1000:,.2f}K</div>
+               <div class="metric-sub-label">Net: {format_currency_smart(metrics['net_revenue'])}</div>
            </div>
            {get_top_kpi_circle(metrics['refund_rate'], "Refund Rate", "#2DD4BF")}
        </div>"""
@@ -985,7 +998,7 @@ def main():
                <div class="metric-label">NET PROFIT</div>
                <div class="metric-value">${metrics['net_profit']:,.2f}</div>
                {format_delta_html(metrics.get('net_profit_delta', 0))}
-               <div class="metric-sub-label">Gross: ${metrics['gross_profit']/1000:,.2f}K</div>
+               <div class="metric-sub-label">Gross: {format_currency_smart(metrics['gross_profit'])}</div>
            </div>
            {get_top_kpi_circle(margin_pct, "Net Margin", "#818CF8")}
        </div>"""
@@ -1044,15 +1057,15 @@ def main():
            <div class="cost-panel-container">
                <div class="cost-header">Cost Breakdown</div>
                <div class="kpi-row">
-                   {get_cost_circle(pct_cogs, f"${metrics_filtered['total_cogs']/1000:.2f}K", "COGS", "#2DD4BF")}
-                   {get_cost_circle(pct_fees, f"${metrics_filtered['total_fees']/1000:.2f}K", "Fees", "#2DD4BF")}
-                   {get_cost_circle(pct_tax, f"${metrics_filtered['total_tax_owed']/1000:.2f}K", "Tax Owed", "#2DD4BF")}
+                   {get_cost_circle(pct_cogs, format_currency_smart(metrics_filtered['total_cogs']), "COGS", "#2DD4BF")}
+                   {get_cost_circle(pct_fees, format_currency_smart(metrics_filtered['total_fees']), "Fees", "#2DD4BF")}
+                   {get_cost_circle(pct_tax, format_currency_smart(metrics_filtered['total_tax_owed']), "Tax Owed", "#2DD4BF")}
                </div>
                <div class="cost-header">Data Summary</div>
                <div class="kpi-row">
-                   {get_cost_circle(pct_ship, f"${metrics_filtered['total_shipping']/1000:.2f}K", "Shipping", "#2DD4BF")}
-                   {get_cost_circle(pct_refund, f"${metrics_filtered['total_refunds']/1000:.2f}K", "Refunds", "#2DD4BF")}
-                   {get_cost_circle(pct_discount, f"${metrics_filtered['total_discounts']/1000:.2f}K", "Discounts", "#2DD4BF")}
+                   {get_cost_circle(pct_ship, format_currency_smart(metrics_filtered['total_shipping']), "Shipping", "#2DD4BF")}
+                   {get_cost_circle(pct_refund, format_currency_smart(metrics_filtered['total_refunds']), "Refunds", "#2DD4BF")}
+                   {get_cost_circle(pct_discount, format_currency_smart(metrics_filtered['total_discounts']), "Discounts", "#2DD4BF")}
                </div>
            </div>"""
            components.html(cost_html, height=440)

@@ -534,6 +534,9 @@ def fetch_shopify_data() -> pd.DataFrame:
 
         # Merge fee data with order data if available
         if df_fees is not None and not df_fees.empty:
+            # Debug: Show available columns in fee table
+            st.info(f"📊 Shopify_Fees columns: {list(df_fees.columns)}")
+
             # Merge on order_id (or order_number if available)
             merge_key = 'order_id'
             if 'order_number' in df_raw.columns and 'order_number' in df_fees.columns:
@@ -541,16 +544,28 @@ def fetch_shopify_data() -> pd.DataFrame:
             elif 'order_id' in df_fees.columns:
                 merge_key = 'order_id'
 
-            # Aggregate fee data to ensure one row per order
-            # For Shopify: processing_fee should be unique per order
-            # We'll take the first processing_fee value for each order
-            fee_cols_to_keep = [merge_key]
-            if 'processing_fee' in df_fees.columns:
-                fee_cols_to_keep.append('processing_fee')
+            st.info(f"🔗 Merging Shopify fees using key: {merge_key}")
 
-            df_fees_agg = df_fees[fee_cols_to_keep].drop_duplicates(subset=[merge_key], keep='first')
+            # Aggregate fee data to ensure one row per order
+            # For Shopify: Sum processing_fee per order (in case multiple fee records exist)
+            agg_dict = {}
+
+            if 'processing_fee' in df_fees.columns:
+                agg_dict['processing_fee'] = 'sum'
+                st.success(f"✅ Found processing_fee column in Shopify_Fees")
+            else:
+                st.warning(f"⚠️ processing_fee column NOT found in Shopify_Fees. Available: {list(df_fees.columns)}")
+
+            if agg_dict:
+                df_fees_agg = df_fees.groupby(merge_key).agg(agg_dict).reset_index()
+                st.info(f"📈 Aggregated {len(df_fees)} fee records into {len(df_fees_agg)} unique orders")
+            else:
+                # If no fee columns found, just get unique order IDs
+                df_fees_agg = df_fees[[merge_key]].drop_duplicates()
+                st.warning(f"⚠️ No fee columns to aggregate")
 
             df_raw = df_raw.merge(df_fees_agg, on=merge_key, how='left', suffixes=('', '_fee'))
+            st.info(f"🔀 Merged result: {len(df_raw)} rows")
 
         # Transform the data to dashboard format
         df = transform_shopify_walmart_data(df_raw, 'Shopify')

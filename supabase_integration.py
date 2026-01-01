@@ -397,10 +397,9 @@ def transform_amazon_data(df: pd.DataFrame) -> pd.DataFrame:
     # Estimate: 40% of revenue (adjust as needed)
     transformed['cogs'] = transformed['revenue'] * 0.40
 
-    # Amazon platform fees - use shop_fees from Amazon_Fees table
-    if 'shop_fees' in df.columns:
-        shop_fees_clean = df['shop_fees'].astype(str).str.replace('$', '').str.replace(',', '').str.strip()
-        transformed['platform_fee'] = pd.to_numeric(shop_fees_clean, errors='coerce').fillna(0)
+    # Amazon platform fees - use referral_fee from Amazon_Fees table
+    if 'referral_fee' in df.columns:
+        transformed['platform_fee'] = pd.to_numeric(df['referral_fee'], errors='coerce').fillna(0)
     else:
         # Fallback: calculate as 15% referral fee + $0.99 per item
         transformed['platform_fee'] = (transformed['revenue'] * 0.15) + 0.99
@@ -715,28 +714,35 @@ def fetch_amazon_data() -> pd.DataFrame:
 
         # Merge fee data with order data if available
         if df_fees is not None and not df_fees.empty:
-            # Merge on amazon-order-id
-            if 'amazon-order-id' in df_fees.columns:
-                # Aggregate fee data by amazon-order-id
+            # Merge on order_id (Amazon_Fees uses order_id to match amazon-order-id)
+            if 'order_id' in df_fees.columns and 'amazon-order-id' in df_raw.columns:
+                # Aggregate fee data by order_id
                 # For Amazon we need:
-                # - shop_fees for platform fees
+                # - referral_fee for platform fees
                 # - shipping_label_cost for shipping costs
 
-                fee_cols_to_aggregate = ['amazon-order-id']
                 agg_dict = {}
 
-                if 'shop_fees' in df_fees.columns:
-                    fee_cols_to_aggregate.append('shop_fees')
-                    agg_dict['shop_fees'] = 'sum'
+                if 'referral_fee' in df_fees.columns:
+                    # Convert to numeric and take absolute value
+                    df_fees['referral_fee'] = pd.to_numeric(df_fees['referral_fee'], errors='coerce').fillna(0).abs()
+                    agg_dict['referral_fee'] = 'sum'
 
                 if 'shipping_label_cost' in df_fees.columns:
-                    fee_cols_to_aggregate.append('shipping_label_cost')
+                    # Convert to numeric and take absolute value
+                    df_fees['shipping_label_cost'] = pd.to_numeric(df_fees['shipping_label_cost'], errors='coerce').fillna(0).abs()
                     agg_dict['shipping_label_cost'] = 'sum'
 
-                # Aggregate fees per order
-                df_fees_agg = df_fees.groupby('amazon-order-id').agg(agg_dict).reset_index()
+                if agg_dict:
+                    # Aggregate fees per order
+                    df_fees_agg = df_fees.groupby('order_id').agg(agg_dict).reset_index()
 
-                df_raw = df_raw.merge(df_fees_agg, on='amazon-order-id', how='left', suffixes=('', '_fee'))
+                    # Ensure both columns are strings for merge
+                    df_raw['amazon-order-id'] = df_raw['amazon-order-id'].astype(str)
+                    df_fees_agg['order_id'] = df_fees_agg['order_id'].astype(str)
+
+                    # Merge using amazon-order-id from OrderData and order_id from Fees
+                    df_raw = df_raw.merge(df_fees_agg, left_on='amazon-order-id', right_on='order_id', how='left', suffixes=('', '_fee'))
 
         # Transform the data to dashboard format
         df = transform_amazon_data(df_raw)

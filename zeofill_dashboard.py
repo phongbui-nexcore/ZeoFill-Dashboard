@@ -713,16 +713,27 @@ def chart_profit_margin_trend(df):
 
 def chart_waterfall_profit(df):
    vals = [df['revenue'].sum(), -df['refund_amount'].sum(), -df['cogs'].sum(), -df['shipping_cost'].sum(), -df['platform_fee'].sum(), df['net_profit'].sum()]
+   # Create custom text labels showing the actual amount (not cumulative)
+   text_labels = [
+       f"${df['revenue'].sum():,.2f}",
+       f"-${df['refund_amount'].sum():,.2f}",
+       f"-${df['cogs'].sum():,.2f}",
+       f"-${df['shipping_cost'].sum():,.2f}",
+       f"-${df['platform_fee'].sum():,.2f}",
+       f"${df['net_profit'].sum():,.2f}"
+   ]
    fig = go.Figure(go.Waterfall(
        name="Profit", orientation="v",
        measure=["relative", "relative", "relative", "relative", "relative", "total"],
        x=["Revenue", "Refunds", "COGS", "Shipping", "Fees", "Net Profit"],
        y=vals,
+       text=text_labels,
+       textposition="outside",
        connector={"line": {"color": "#2DD4BF"}},
        increasing={"marker": {"color": "#2DD4BF"}},
        decreasing={"marker": {"color": "#F87171"}},
        totals={"marker": {"color": "#818CF8"}},
-       hovertemplate='<b>%{x}</b><br>$%{y:,.2f}<extra></extra>' # 2 decimals
+       hovertemplate='<b>%{x}</b><br>%{text}<extra></extra>'
    ))
    return apply_chart_theme(fig, height=350)
 
@@ -873,12 +884,13 @@ def main():
        status_text = "● Live Data" if SUPABASE_AVAILABLE else "● Demo Mode"
        status_class = "status-live" if SUPABASE_AVAILABLE else "status-sample"
 
-       # Logo and status display
-       logo_col, status_col = st.columns([1, 1])
-       with logo_col:
-           st.markdown(f'<img src="{ZEOFILL_LOGO_URL}" style="height: 70px; margin-right: 15px;">', unsafe_allow_html=True)
-       with status_col:
-           st.markdown(f'<div class="status-pill {status_class}" style="margin-top: 20px;">{status_text}</div>', unsafe_allow_html=True)
+       # Logo and status display - right aligned
+       st.markdown(f'''
+       <div style="display: flex; justify-content: flex-end; align-items: center; gap: 15px;">
+           <img src="{ZEOFILL_LOGO_URL}" style="height: 70px;">
+           <div class="status-pill {status_class}">{status_text}</div>
+       </div>
+       ''', unsafe_allow_html=True)
 
    st.markdown('<div class="title-spacer"></div>', unsafe_allow_html=True)
 

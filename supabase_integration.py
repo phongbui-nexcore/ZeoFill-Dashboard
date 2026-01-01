@@ -241,8 +241,10 @@ def transform_shopify_walmart_data(df: pd.DataFrame, channel: str) -> pd.DataFra
         # Fallback for unknown channels
         transformed['platform_fee'] = 0
 
-    # Discounts - check if discount column exists, otherwise set to 0
-    if 'discount' in df.columns:
+    # Discounts - use line_discount column for Shopify/Walmart
+    if 'line_discount' in df.columns:
+        transformed['discount'] = pd.to_numeric(df['line_discount'], errors='coerce').fillna(0)
+    elif 'discount' in df.columns:
         transformed['discount'] = pd.to_numeric(df['discount'], errors='coerce').fillna(0)
     else:
         transformed['discount'] = 0

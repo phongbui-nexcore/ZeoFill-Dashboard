@@ -33,6 +33,9 @@ def check_password():
         if st.session_state["password"] == correct_password:
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # Don't store password
+            # Clear data_loaded to show loading screen after login
+            if 'data_loaded' in st.session_state:
+                del st.session_state['data_loaded']
         else:
             st.session_state["password_correct"] = False
 
@@ -798,16 +801,69 @@ def main():
 
    st.markdown('<div class="title-spacer"></div>', unsafe_allow_html=True)
 
-   # Data Processing
+   # Data Processing with professional loading screen
    # Load data from Supabase if available, otherwise use sample data
-   if SUPABASE_AVAILABLE:
-       df_full = fetch_all_order_data()
-       if df_full is None or df_full.empty:
-           st.warning("⚠️ Could not load Supabase data. Using sample data.")
-           df_full = generate_sample_data()
+   if 'data_loaded' not in st.session_state:
+       # Show loading screen on first load
+       with st.spinner(''):
+           st.markdown("""
+               <style>
+               .loading-container {
+                   display: flex;
+                   flex-direction: column;
+                   align-items: center;
+                   justify-content: center;
+                   min-height: 400px;
+                   text-align: center;
+               }
+               .loading-spinner {
+                   border: 4px solid rgba(45, 212, 191, 0.1);
+                   border-top: 4px solid #2DD4BF;
+                   border-radius: 50%;
+                   width: 50px;
+                   height: 50px;
+                   animation: spin 1s linear infinite;
+                   margin-bottom: 20px;
+               }
+               @keyframes spin {
+                   0% { transform: rotate(0deg); }
+                   100% { transform: rotate(360deg); }
+               }
+               .loading-text {
+                   color: #9CA3AF;
+                   font-size: 1.1rem;
+                   margin-top: 10px;
+               }
+               </style>
+               <div class="loading-container">
+                   <div class="loading-spinner"></div>
+                   <div class="loading-text">Loading dashboard data...</div>
+               </div>
+           """, unsafe_allow_html=True)
+
+           if SUPABASE_AVAILABLE:
+               df_full = fetch_all_order_data()
+               if df_full is None or df_full.empty:
+                   st.warning("⚠️ Could not load Supabase data. Using sample data.")
+                   df_full = generate_sample_data()
+           else:
+               df_full = generate_sample_data()
+
+           st.session_state['data_loaded'] = True
+           st.session_state['df_full'] = df_full
+           st.rerun()
    else:
-       df_full = generate_sample_data()
-  
+       # Use cached data for seamless experience
+       df_full = st.session_state.get('df_full')
+       if df_full is None or df_full.empty:
+           if SUPABASE_AVAILABLE:
+               df_full = fetch_all_order_data()
+               if df_full is None or df_full.empty:
+                   df_full = generate_sample_data()
+           else:
+               df_full = generate_sample_data()
+           st.session_state['df_full'] = df_full
+
    # Store unfiltered data for later use
    df_unfiltered = df_full.copy()
 

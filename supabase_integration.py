@@ -534,14 +534,11 @@ def fetch_shopify_data() -> pd.DataFrame:
 
         # Merge fee data with order data if available
         if df_fees is not None and not df_fees.empty:
-            # Determine merge key - prefer order_number for Shopify
-            merge_key = None
-            if 'order_number' in df_raw.columns and 'order_number' in df_fees.columns:
-                merge_key = 'order_number'
-            elif 'order_id' in df_raw.columns and 'order_id' in df_fees.columns:
-                merge_key = 'order_id'
+            # For Shopify: Always use order_id as merge key (Shopify_Fees doesn't have order_number)
+            # User searches by order_number, but backend lookup uses order_id
+            merge_key = 'order_id'
 
-            if merge_key:
+            if merge_key in df_raw.columns and merge_key in df_fees.columns:
                 # Aggregate fee data to ensure one row per order
                 # For Shopify: Sum processing_fee per order (fees might be stored as negative values)
                 agg_dict = {}
@@ -557,7 +554,7 @@ def fetch_shopify_data() -> pd.DataFrame:
                     # If no fee columns found, just get unique order IDs
                     df_fees_agg = df_fees[[merge_key]].drop_duplicates()
 
-                # Merge with order data
+                # Merge with order data using order_id
                 df_raw = df_raw.merge(df_fees_agg, on=merge_key, how='left', suffixes=('', '_fee'))
 
         # Transform the data to dashboard format

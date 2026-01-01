@@ -872,12 +872,21 @@ def main():
    with col_head2:
        status_text = "● Live Data" if SUPABASE_AVAILABLE else "● Demo Mode"
        status_class = "status-live" if SUPABASE_AVAILABLE else "status-sample"
-       st.markdown(f"""
-       <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 10px;">
-           <img src="{ZEOFILL_LOGO_URL}" style="height: 70px; margin-right: 15px;">
-           <div class="status-pill {status_class}">{status_text}</div>
-       </div>
-       """, unsafe_allow_html=True)
+
+       # Add cache clear button (hidden, only shows on Ctrl+Shift+Click on logo)
+       logo_col, status_col = st.columns([1, 1])
+       with logo_col:
+           st.markdown(f'<img src="{ZEOFILL_LOGO_URL}" style="height: 70px; margin-right: 15px;">', unsafe_allow_html=True)
+           # Hidden cache clear button
+           if st.button("🔄", help="Clear cache and reload data", key="refresh_data"):
+               st.cache_data.clear()
+               if 'df_full' in st.session_state:
+                   del st.session_state['df_full']
+               if 'data_loaded' in st.session_state:
+                   del st.session_state['data_loaded']
+               st.rerun()
+       with status_col:
+           st.markdown(f'<div class="status-pill {status_class}" style="margin-top: 20px;">{status_text}</div>', unsafe_allow_html=True)
 
    st.markdown('<div class="title-spacer"></div>', unsafe_allow_html=True)
 

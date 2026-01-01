@@ -968,13 +968,21 @@ def main():
    metrics_filtered = calculate_metrics(df)
 
    # Calculate KPI metrics for last 30 days with filtered data
-   end_date = df['date'].max()
-   start_date = end_date - timedelta(days=30)
-   prev_start = start_date - timedelta(days=30)
+   # UNLESS we're searching for a specific order - then show that order's metrics
+   if order_search and order_search.strip():
+       # When searching for a specific order, use all matching orders (don't filter by date)
+       df_curr = df
+       df_prev = pd.DataFrame()  # No previous period for single order search
+       metrics = calculate_metrics(df_curr, df_prev)
+   else:
+       # Normal date range filtering for KPIs
+       end_date = df['date'].max()
+       start_date = end_date - timedelta(days=30)
+       prev_start = start_date - timedelta(days=30)
 
-   df_curr = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
-   df_prev = df[(df['date'] >= prev_start) & (df['date'] < start_date)]
-   metrics = calculate_metrics(df_curr, df_prev)
+       df_curr = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+       df_prev = df[(df['date'] >= prev_start) & (df['date'] < start_date)]
+       metrics = calculate_metrics(df_curr, df_prev)
 
    # Helper function for delta formatting
    def format_delta_html(delta: float):
